@@ -22,6 +22,9 @@ module fgof_screen
     fill_screen, &
     put_cell, &
     put_glyph, &
+    render_cursor_ansi, &
+    render_screen_ansi, &
+    render_screen_diff_ansi, &
     resize_screen, &
     set_cursor, &
     screen_buffer, &
@@ -35,6 +38,14 @@ contains
 
   function clear_screen_style() result(style)
     type(screen_style) :: style
+
+    style%fg = -1
+    style%bg = -1
+    style%bold = .false.
+    style%dim = .false.
+    style%italic = .false.
+    style%underline = .false.
+    style%inverse = .false.
   end function clear_screen_style
 
   function clear_screen_cell() result(cell)
@@ -46,15 +57,29 @@ contains
 
   function clear_screen_size() result(size_value)
     type(screen_size) :: size_value
+
+    size_value%width = 0
+    size_value%height = 0
   end function clear_screen_size
 
   function clear_screen_damage() result(damage)
     type(screen_damage) :: damage
+
+    damage%active = .false.
+    damage%row_first = 0
+    damage%row_last = 0
+    damage%col_first = 0
+    damage%col_last = 0
+    damage%changed_cells = 0
   end function clear_screen_damage
 
   function clear_screen_diff() result(diff)
     type(screen_diff) :: diff
 
+    diff%changed = .false.
+    diff%size_changed = .false.
+    diff%cursor_changed = .false.
+    diff%cursor_visibility_changed = .false.
     diff%previous_size = clear_screen_size()
     diff%current_size = clear_screen_size()
     diff%damage = clear_screen_damage()
@@ -213,6 +238,60 @@ contains
                    diff%cursor_changed .or. diff%cursor_visibility_changed
   end function diff_screen
 
+  function render_screen_ansi(buffer) result(output)
+    type(screen_buffer), intent(in) :: buffer
+    character(len=:), allocatable :: output
+    integer :: row
+
+    output = hide_cursor_ansi() // clear_screen_ansi()
+
+    if (allocated(buffer%cells)) then
+      do row = 1, size(buffer%cells, 1)
+        output = output // render_current_row_ansi(buffer, row, 1, size(buffer%cells, 2))
+        if (row < size(buffer%cells, 1)) output = output // new_line("a")
+      end do
+    end if
+
+    output = output // reset_style_ansi() // render_cursor_ansi(buffer)
+  end function render_screen_ansi
+
+  function render_screen_diff_ansi(previous, current) result(output)
+    type(screen_buffer), intent(in) :: previous
+    type(screen_buffer), intent(in) :: current
+    character(len=:), allocatable :: output
+    type(screen_diff) :: diff
+    integer :: row
+
+    diff = diff_screen(previous, current)
+    if (.not. diff%changed) then
+      output = ""
+      return
+    end if
+
+    output = ""
+    if (diff%damage%active) then
+      output = hide_cursor_ansi()
+      do row = diff%damage%row_first, diff%damage%row_last
+        output = output // move_cursor_ansi(row, diff%damage%col_first)
+        output = output // render_diff_row_ansi(previous, current, row, diff%damage%col_first, diff%damage%col_last)
+      end do
+      output = output // reset_style_ansi()
+    end if
+
+    output = output // render_cursor_ansi(current)
+  end function render_screen_diff_ansi
+
+  function render_cursor_ansi(buffer) result(output)
+    type(screen_buffer), intent(in) :: buffer
+    character(len=:), allocatable :: output
+
+    if (buffer%cursor_visible) then
+      output = move_cursor_ansi(buffer%cursor_row, buffer%cursor_col) // show_cursor_ansi()
+    else
+      output = hide_cursor_ansi()
+    end if
+  end function render_cursor_ansi
+
   logical function screen_index_in_bounds(buffer, row, col) result(in_bounds)
     type(screen_buffer), intent(in) :: buffer
     integer, intent(in) :: row
@@ -310,5 +389,182 @@ contains
 
     damage%changed_cells = damage%changed_cells + 1
   end subroutine record_damage
+
+  function render_current_row_ansi(buffer, row, col_first, col_last) result(output)
+    type(screen_buffer), intent(in) :: buffer
+    integer, intent(in) :: row
+    integer, intent(in) :: col_first
+    integer, intent(in) :: col_last
+    character(len=:), allocatable :: output
+    type(screen_cell) :: cell
+    character(len=:), allocatable :: current_key
+    character(len=:), allocatable :: cell_key
+    integer :: col
+
+    output = ""
+    current_key = ""
+
+    do col = col_first, col_last
+      cell = buffer%cells(row, col)
+      cell_key = style_key(cell%style)
+      if (cell_key /= current_key) then
+        if (len(cell_key) > 0) then
+          output = output // style_ansi(cell%style)
+        else if (len(current_key) > 0) then
+          output = output // reset_style_ansi()
+        end if
+        current_key = cell_key
+      end if
+      output = output // cell%glyph
+    end do
+
+    if (len(current_key) > 0) then
+      output = output // reset_style_ansi()
+    end if
+  end function render_current_row_ansi
+
+  function render_diff_row_ansi(previous, current, row, col_first, col_last) result(output)
+    type(screen_buffer), intent(in) :: previous
+    type(screen_buffer), intent(in) :: current
+    integer, intent(in) :: row
+    integer, intent(in) :: col_first
+    integer, intent(in) :: col_last
+    character(len=:), allocatable :: output
+    type(screen_cell) :: cell
+    character(len=:), allocatable :: current_key
+    character(len=:), allocatable :: cell_key
+    integer :: col
+
+    output = ""
+    current_key = ""
+
+    do col = col_first, col_last
+      cell = screen_cell_for_diff(previous, current, row, col)
+      cell_key = style_key(cell%style)
+      if (cell_key /= current_key) then
+        if (len(cell_key) > 0) then
+          output = output // style_ansi(cell%style)
+        else if (len(current_key) > 0) then
+          output = output // reset_style_ansi()
+        end if
+        current_key = cell_key
+      end if
+      output = output // cell%glyph
+    end do
+
+    if (len(current_key) > 0) then
+      output = output // reset_style_ansi()
+    end if
+  end function render_diff_row_ansi
+
+  function screen_cell_for_diff(previous, current, row, col) result(cell)
+    type(screen_buffer), intent(in) :: previous
+    type(screen_buffer), intent(in) :: current
+    integer, intent(in) :: row
+    integer, intent(in) :: col
+    type(screen_cell) :: cell
+
+    cell = clear_screen_cell()
+    if (screen_index_in_bounds(current, row, col)) then
+      cell = current%cells(row, col)
+      return
+    end if
+
+    if (screen_index_in_bounds(previous, row, col)) then
+      cell = clear_screen_cell()
+    end if
+  end function screen_cell_for_diff
+
+  logical function style_is_default(style) result(is_default)
+    type(screen_style), intent(in) :: style
+
+    is_default = style%fg < 0 .and. style%bg < 0 .and. &
+                 (.not. style%bold) .and. (.not. style%dim) .and. &
+                 (.not. style%italic) .and. (.not. style%underline) .and. &
+                 (.not. style%inverse)
+  end function style_is_default
+
+  function style_key(style) result(key)
+    type(screen_style), intent(in) :: style
+    character(len=:), allocatable :: key
+
+    if (style_is_default(style)) then
+      key = ""
+      return
+    end if
+
+    key = integer_text(style%fg) // ":" // integer_text(style%bg) // ":" // &
+          merge("1", "0", style%bold) // ":" // merge("1", "0", style%dim) // ":" // &
+          merge("1", "0", style%italic) // ":" // merge("1", "0", style%underline) // ":" // &
+          merge("1", "0", style%inverse)
+  end function style_key
+
+  function style_ansi(style) result(output)
+    type(screen_style), intent(in) :: style
+    character(len=:), allocatable :: output
+
+    output = reset_style_ansi()
+    if (style%bold) output = output // sgr_parameter("1")
+    if (style%dim) output = output // sgr_parameter("2")
+    if (style%italic) output = output // sgr_parameter("3")
+    if (style%underline) output = output // sgr_parameter("4")
+    if (style%inverse) output = output // sgr_parameter("7")
+    if (style%fg >= 0) output = output // sgr_parameter("38;5;" // integer_text(style%fg))
+    if (style%bg >= 0) output = output // sgr_parameter("48;5;" // integer_text(style%bg))
+  end function style_ansi
+
+  function sgr_parameter(parameter) result(output)
+    character(len=*), intent(in) :: parameter
+    character(len=:), allocatable :: output
+
+    output = csi() // parameter // "m"
+  end function sgr_parameter
+
+  function reset_style_ansi() result(output)
+    character(len=:), allocatable :: output
+
+    output = csi() // "0m"
+  end function reset_style_ansi
+
+  function clear_screen_ansi() result(output)
+    character(len=:), allocatable :: output
+
+    output = csi() // "2J" // csi() // "H"
+  end function clear_screen_ansi
+
+  function move_cursor_ansi(row, col) result(output)
+    integer, intent(in) :: row
+    integer, intent(in) :: col
+    character(len=:), allocatable :: output
+
+    output = csi() // integer_text(max(1, row)) // ";" // integer_text(max(1, col)) // "H"
+  end function move_cursor_ansi
+
+  function hide_cursor_ansi() result(output)
+    character(len=:), allocatable :: output
+
+    output = csi() // "?25l"
+  end function hide_cursor_ansi
+
+  function show_cursor_ansi() result(output)
+    character(len=:), allocatable :: output
+
+    output = csi() // "?25h"
+  end function show_cursor_ansi
+
+  function csi() result(output)
+    character(len=:), allocatable :: output
+
+    output = achar(27) // "["
+  end function csi
+
+  function integer_text(value) result(text)
+    integer, intent(in) :: value
+    character(len=:), allocatable :: text
+    character(len=32) :: scratch
+
+    write(scratch, "(i0)") value
+    text = trim(scratch)
+  end function integer_text
 
 end module fgof_screen
