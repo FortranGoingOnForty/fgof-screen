@@ -1,6 +1,7 @@
 program test_screen_render_edges
   use fgof_screen, only : &
     allocate_screen, &
+    put_glyph, &
     render_screen_ansi, &
     render_screen_diff_ansi, &
     set_cursor
@@ -35,4 +36,19 @@ program test_screen_render_edges
   rendered = render_screen_diff_ansi(previous, current)
   expected = esc // "?25l"
   if (rendered /= expected) error stop "cursor-visibility-only diffs should render only the visibility change"
+
+  current = allocate_screen(2, 1)
+  call put_glyph(current, 1, 1, achar(27))
+  call put_glyph(current, 1, 2, new_line("a"))
+  rendered = render_screen_ansi(current)
+  expected = esc // "?25l" // esc // "2J" // esc // "H" // &
+             esc // "1;1H" // "??" // esc // "0m" // esc // "1;1H" // esc // "?25h"
+  if (rendered /= expected) error stop "full renders should sanitize control glyphs before emitting ANSI output"
+
+  previous = allocate_screen(2, 1)
+  current = previous
+  call put_glyph(current, 1, 2, achar(9))
+  rendered = render_screen_diff_ansi(previous, current)
+  expected = esc // "?25l" // esc // "1;2H" // "?" // esc // "0m" // esc // "1;1H" // esc // "?25h"
+  if (rendered /= expected) error stop "diff renders should sanitize control glyphs before emitting ANSI output"
 end program test_screen_render_edges

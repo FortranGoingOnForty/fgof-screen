@@ -28,9 +28,10 @@ program test_screen_render_ansi
   call set_cursor(previous, 2, 1)
 
   expected = esc // "?25l" // esc // "2J" // esc // "H" // &
-             "AB" // new_line("a") // "CD" // esc // "0m" // esc // "2;1H" // esc // "?25h"
+             esc // "1;1H" // "AB" // esc // "2;1H" // "CD" // &
+             esc // "0m" // esc // "2;1H" // esc // "?25h"
   rendered = render_screen_ansi(previous)
-  if (rendered /= expected) error stop "render_screen_ansi should render a full blank-style frame deterministically"
+  if (rendered /= expected) error stop "render_screen_ansi should use explicit row addressing for full-frame repaints"
 
   style = clear_screen_style()
   style%fg = 33

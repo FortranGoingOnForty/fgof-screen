@@ -38,6 +38,8 @@ Tracked today:
 - explicit cursor-state ANSI output
 - tracked example programs for full-frame and diff rendering
 - render-edge coverage for empty screens and cursor-only diffs
+- full-frame ANSI output with explicit row addressing
+- render-time sanitization for non-printable control glyphs
 - CI on macOS and Ubuntu, including direct example execution
 - row-first, column-second grid semantics pinned down in tests
 - focused scaffold coverage in `fpm test`
@@ -92,10 +94,11 @@ Current semantics:
 - `diff_screen(previous, current)` compares two virtual frames and reports cell damage separately from size or cursor changes
 - `screen_diff%damage` uses one bounding rectangle plus a `changed_cells` count for the changed frame area
 - newly added or removed visible cells from resizes count as changed damage even when their glyphs are blank
-- `render_screen_ansi()` emits a whole-frame ANSI repaint with clear/home semantics and final cursor restoration
+- `render_screen_ansi()` emits a whole-frame ANSI repaint with clear/home semantics, explicit row addressing, and final cursor restoration
 - `render_screen_diff_ansi()` emits a damage-scoped ANSI repaint and uses blank cells to erase removed content after shrinks
 - `render_cursor_ansi()` emits the final cursor move plus visibility state for a screen buffer
 - ANSI row rendering tracks style transitions explicitly and resets back to default style when needed
+- ANSI renderers replace ASCII control glyphs with `?` so screen cells cannot inject raw control bytes into the output stream
 
 ## Build And Test
 

@@ -247,8 +247,8 @@ contains
 
     if (allocated(buffer%cells)) then
       do row = 1, size(buffer%cells, 1)
+        output = output // move_cursor_ansi(row, 1)
         output = output // render_current_row_ansi(buffer, row, 1, size(buffer%cells, 2))
-        if (row < size(buffer%cells, 1)) output = output // new_line("a")
       end do
     end if
 
@@ -415,7 +415,7 @@ contains
         end if
         current_key = cell_key
       end if
-      output = output // cell%glyph
+      output = output // renderable_glyph(cell%glyph)
     end do
 
     if (len(current_key) > 0) then
@@ -449,7 +449,7 @@ contains
         end if
         current_key = cell_key
       end if
-      output = output // cell%glyph
+      output = output // renderable_glyph(cell%glyph)
     end do
 
     if (len(current_key) > 0) then
@@ -566,5 +566,18 @@ contains
     write(scratch, "(i0)") value
     text = trim(scratch)
   end function integer_text
+
+  function renderable_glyph(glyph) result(output)
+    character(len=1), intent(in) :: glyph
+    character(len=1) :: output
+    integer :: code
+
+    code = iachar(glyph)
+    if (code < 32 .or. code == 127) then
+      output = "?"
+    else
+      output = glyph
+    end if
+  end function renderable_glyph
 
 end module fgof_screen
