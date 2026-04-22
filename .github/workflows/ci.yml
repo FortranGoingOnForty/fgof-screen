@@ -58,3 +58,10 @@ jobs:
 
       - name: Run test suite
         run: fpm test --verbose
+
+      - name: Run examples
+        run: |
+          full_example="$(find build -path '*/example/full_render_demo' | head -n 1)"
+          diff_example="$(find build -path '*/example/diff_render_demo' | head -n 1)"
+          "${full_example}"
+          "${diff_example}"
