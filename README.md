@@ -13,18 +13,17 @@ Current v1 target:
 
 - stable screen style, cell, size, and buffer types
 - predictable virtual-grid allocation and fill helpers
-- diffable screen-state model for future ANSI-first rendering
+- diffable screen-state model with damage tracking for future ANSI-first rendering
 - room for a higher-level renderer without making ncurses the package identity
 
 Future scope:
 
-- frame diff computation and damage regions
 - ANSI rendering helpers and cursor-state output
 - optional adapter layers for alternate backends later
 
 ## Status
 
-Sprint 01 is in place.
+Sprint 02 is in place.
 
 Tracked today:
 
@@ -32,6 +31,8 @@ Tracked today:
 - foundational screen types for styles, cells, sizes, and buffers
 - virtual-grid allocation, resize, fill, and clear helpers
 - explicit cell writes and cursor clamping helpers
+- frame diff computation with changed-cell counts and damage bounds
+- explicit size, cursor, and cursor-visibility change reporting
 - row-first, column-second grid semantics pinned down in tests
 - focused scaffold coverage in `fpm test`
 
@@ -48,17 +49,22 @@ Public types:
 - `screen_cell`
 - `screen_size`
 - `screen_buffer`
+- `screen_damage`
+- `screen_diff`
 
 Current public procedures:
 
 - `clear_screen_style`
 - `clear_screen_cell`
+- `clear_screen_damage`
+- `clear_screen_diff`
 - `clear_screen_size`
 - `clear_screen_buffer`
 - `allocate_screen`
 - `resize_screen`
 - `fill_screen`
 - `clear_screen`
+- `diff_screen`
 - `put_cell`
 - `put_glyph`
 - `set_cursor`
@@ -74,6 +80,9 @@ Current semantics:
 - `put_cell()` and `put_glyph()` update a specific `(row, col)` location without transposing the grid model
 - out-of-bounds cell writes are ignored rather than clamped to another location
 - `set_cursor()` keeps cursor position within the allocated grid, or resets it to `(1, 1)` when the buffer is empty
+- `diff_screen(previous, current)` compares two virtual frames and reports cell damage separately from size or cursor changes
+- `screen_diff%damage` uses one bounding rectangle plus a `changed_cells` count for the changed frame area
+- newly added or removed visible cells from resizes count as changed damage even when their glyphs are blank
 
 ## Build And Test
 
