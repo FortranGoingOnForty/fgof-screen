@@ -18,12 +18,12 @@ Current v1 target:
 
 Future scope:
 
-- ANSI rendering helpers and cursor-state output
 - optional adapter layers for alternate backends later
+- examples and higher-level paint helpers
 
 ## Status
 
-Sprint 02 is in place.
+Sprint 03 is in place.
 
 Tracked today:
 
@@ -33,6 +33,9 @@ Tracked today:
 - explicit cell writes and cursor clamping helpers
 - frame diff computation with changed-cell counts and damage bounds
 - explicit size, cursor, and cursor-visibility change reporting
+- ANSI full-frame rendering
+- ANSI diff rendering driven by the damage model
+- explicit cursor-state ANSI output
 - row-first, column-second grid semantics pinned down in tests
 - focused scaffold coverage in `fpm test`
 
@@ -67,6 +70,9 @@ Current public procedures:
 - `diff_screen`
 - `put_cell`
 - `put_glyph`
+- `render_cursor_ansi`
+- `render_screen_ansi`
+- `render_screen_diff_ansi`
 - `set_cursor`
 
 Current semantics:
@@ -83,6 +89,10 @@ Current semantics:
 - `diff_screen(previous, current)` compares two virtual frames and reports cell damage separately from size or cursor changes
 - `screen_diff%damage` uses one bounding rectangle plus a `changed_cells` count for the changed frame area
 - newly added or removed visible cells from resizes count as changed damage even when their glyphs are blank
+- `render_screen_ansi()` emits a whole-frame ANSI repaint with clear/home semantics and final cursor restoration
+- `render_screen_diff_ansi()` emits a damage-scoped ANSI repaint and uses blank cells to erase removed content after shrinks
+- `render_cursor_ansi()` emits the final cursor move plus visibility state for a screen buffer
+- ANSI row rendering tracks style transitions explicitly and resets back to default style when needed
 
 ## Build And Test
 
