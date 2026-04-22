@@ -1,5 +1,11 @@
 module fgof_screen
-  use fgof_screen_types, only : screen_buffer, screen_cell, screen_size, screen_style
+  use fgof_screen_types, only : &
+    screen_buffer, &
+    screen_cell, &
+    screen_damage, &
+    screen_diff, &
+    screen_size, &
+    screen_style
   implicit none
   private
 
@@ -8,8 +14,11 @@ module fgof_screen
     clear_screen, &
     clear_screen_buffer, &
     clear_screen_cell, &
+    clear_screen_damage, &
+    clear_screen_diff, &
     clear_screen_size, &
     clear_screen_style, &
+    diff_screen, &
     fill_screen, &
     put_cell, &
     put_glyph, &
@@ -17,6 +26,8 @@ module fgof_screen
     set_cursor, &
     screen_buffer, &
     screen_cell, &
+    screen_damage, &
+    screen_diff, &
     screen_size, &
     screen_style
 
@@ -36,6 +47,18 @@ contains
   function clear_screen_size() result(size_value)
     type(screen_size) :: size_value
   end function clear_screen_size
+
+  function clear_screen_damage() result(damage)
+    type(screen_damage) :: damage
+  end function clear_screen_damage
+
+  function clear_screen_diff() result(diff)
+    type(screen_diff) :: diff
+
+    diff%previous_size = clear_screen_size()
+    diff%current_size = clear_screen_size()
+    diff%damage = clear_screen_damage()
+  end function clear_screen_diff
 
   function clear_screen_buffer() result(buffer)
     type(screen_buffer) :: buffer
@@ -158,6 +181,38 @@ contains
     call clamp_cursor(buffer)
   end subroutine set_cursor
 
+  function diff_screen(previous, current) result(diff)
+    type(screen_buffer), intent(in) :: previous
+    type(screen_buffer), intent(in) :: current
+    type(screen_diff) :: diff
+    integer :: max_rows
+    integer :: max_cols
+    integer :: row
+    integer :: col
+
+    diff = clear_screen_diff()
+    diff%previous_size = previous%size
+    diff%current_size = current%size
+    diff%size_changed = .not. screen_sizes_equal(previous%size, current%size)
+    diff%cursor_changed = previous%cursor_row /= current%cursor_row .or. &
+                          previous%cursor_col /= current%cursor_col
+    diff%cursor_visibility_changed = previous%cursor_visible .neqv. current%cursor_visible
+
+    max_rows = max(previous%size%height, current%size%height)
+    max_cols = max(previous%size%width, current%size%width)
+
+    do row = 1, max_rows
+      do col = 1, max_cols
+        if (screen_cell_changed(previous, current, row, col)) then
+          call record_damage(diff%damage, row, col)
+        end if
+      end do
+    end do
+
+    diff%changed = diff%damage%active .or. diff%size_changed .or. &
+                   diff%cursor_changed .or. diff%cursor_visibility_changed
+  end function diff_screen
+
   logical function screen_index_in_bounds(buffer, row, col) result(in_bounds)
     type(screen_buffer), intent(in) :: buffer
     integer, intent(in) :: row
@@ -182,5 +237,78 @@ contains
     buffer%cursor_row = max(1, min(buffer%cursor_row, size(buffer%cells, 1)))
     buffer%cursor_col = max(1, min(buffer%cursor_col, size(buffer%cells, 2)))
   end subroutine clamp_cursor
+
+  logical function screen_cell_changed(previous, current, row, col) result(changed)
+    type(screen_buffer), intent(in) :: previous
+    type(screen_buffer), intent(in) :: current
+    integer, intent(in) :: row
+    integer, intent(in) :: col
+
+    changed = screen_index_in_bounds(previous, row, col) .neqv. &
+              screen_index_in_bounds(current, row, col)
+    if (changed) return
+
+    changed = .not. screen_cells_equal(screen_cell_at(previous, row, col), &
+                                       screen_cell_at(current, row, col))
+  end function screen_cell_changed
+
+  function screen_cell_at(buffer, row, col) result(cell)
+    type(screen_buffer), intent(in) :: buffer
+    integer, intent(in) :: row
+    integer, intent(in) :: col
+    type(screen_cell) :: cell
+
+    cell = clear_screen_cell()
+    if (.not. screen_index_in_bounds(buffer, row, col)) return
+    cell = buffer%cells(row, col)
+  end function screen_cell_at
+
+  logical function screen_cells_equal(left, right) result(equal)
+    type(screen_cell), intent(in) :: left
+    type(screen_cell), intent(in) :: right
+
+    equal = left%glyph == right%glyph .and. screen_styles_equal(left%style, right%style)
+  end function screen_cells_equal
+
+  logical function screen_styles_equal(left, right) result(equal)
+    type(screen_style), intent(in) :: left
+    type(screen_style), intent(in) :: right
+
+    equal = left%fg == right%fg .and. &
+            left%bg == right%bg .and. &
+            left%bold .eqv. right%bold .and. &
+            left%dim .eqv. right%dim .and. &
+            left%italic .eqv. right%italic .and. &
+            left%underline .eqv. right%underline .and. &
+            left%inverse .eqv. right%inverse
+  end function screen_styles_equal
+
+  logical function screen_sizes_equal(left, right) result(equal)
+    type(screen_size), intent(in) :: left
+    type(screen_size), intent(in) :: right
+
+    equal = left%width == right%width .and. left%height == right%height
+  end function screen_sizes_equal
+
+  subroutine record_damage(damage, row, col)
+    type(screen_damage), intent(inout) :: damage
+    integer, intent(in) :: row
+    integer, intent(in) :: col
+
+    if (.not. damage%active) then
+      damage%active = .true.
+      damage%row_first = row
+      damage%row_last = row
+      damage%col_first = col
+      damage%col_last = col
+    else
+      damage%row_first = min(damage%row_first, row)
+      damage%row_last = max(damage%row_last, row)
+      damage%col_first = min(damage%col_first, col)
+      damage%col_last = max(damage%col_last, col)
+    end if
+
+    damage%changed_cells = damage%changed_cells + 1
+  end subroutine record_damage
 
 end module fgof_screen

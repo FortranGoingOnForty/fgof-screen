@@ -30,4 +30,23 @@ module fgof_screen_types
     type(screen_cell), allocatable :: cells(:, :)
   end type screen_buffer
 
+  type, public :: screen_damage
+    logical :: active = .false.
+    integer :: row_first = 0
+    integer :: row_last = 0
+    integer :: col_first = 0
+    integer :: col_last = 0
+    integer :: changed_cells = 0
+  end type screen_damage
+
+  type, public :: screen_diff
+    logical :: changed = .false.
+    logical :: size_changed = .false.
+    logical :: cursor_changed = .false.
+    logical :: cursor_visibility_changed = .false.
+    type(screen_size) :: previous_size
+    type(screen_size) :: current_size
+    type(screen_damage) :: damage
+  end type screen_diff
+
 end module fgof_screen_types
