@@ -23,7 +23,7 @@ Future scope:
 
 ## Status
 
-Sprint 03 is in place.
+Sprint 04 is in place.
 
 Tracked today:
 
@@ -36,6 +36,9 @@ Tracked today:
 - ANSI full-frame rendering
 - ANSI diff rendering driven by the damage model
 - explicit cursor-state ANSI output
+- tracked example programs for full-frame and diff rendering
+- render-edge coverage for empty screens and cursor-only diffs
+- CI on macOS and Ubuntu, including direct example execution
 - row-first, column-second grid semantics pinned down in tests
 - focused scaffold coverage in `fpm test`
 
@@ -99,6 +102,11 @@ Current semantics:
 ```bash
 fpm test
 ```
+
+Tracked examples:
+
+- [full_render_demo.f90](example/full_render_demo.f90)
+- [diff_render_demo.f90](example/diff_render_demo.f90)
 
 ## Supported Platforms
 
