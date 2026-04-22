@@ -24,13 +24,15 @@ Future scope:
 
 ## Status
 
-Initial scaffold is in place.
+Sprint 01 is in place.
 
 Tracked today:
 
 - package layout, CI, and standalone repo setup
 - foundational screen types for styles, cells, sizes, and buffers
-- basic virtual-grid allocation and fill helpers
+- virtual-grid allocation, resize, fill, and clear helpers
+- explicit cell writes and cursor clamping helpers
+- row-first, column-second grid semantics pinned down in tests
 - focused scaffold coverage in `fpm test`
 
 ## Public API Shape
@@ -54,14 +56,24 @@ Current public procedures:
 - `clear_screen_size`
 - `clear_screen_buffer`
 - `allocate_screen`
+- `resize_screen`
 - `fill_screen`
+- `clear_screen`
+- `put_cell`
+- `put_glyph`
+- `set_cursor`
 
 Current semantics:
 
 - `screen_buffer%cells(row, col)` is the current virtual-grid layout
 - `allocate_screen(width, height)` allocates a blank grid for positive sizes
 - newly allocated cells start as blank-space cells with default style
+- `resize_screen()` preserves overlapping content, blanks newly grown cells, and clamps the cursor into bounds
 - `fill_screen()` applies a glyph and optional style across the whole allocated buffer
+- `clear_screen()` is the whole-buffer blank fill helper
+- `put_cell()` and `put_glyph()` update a specific `(row, col)` location without transposing the grid model
+- out-of-bounds cell writes are ignored rather than clamped to another location
+- `set_cursor()` keeps cursor position within the allocated grid, or resets it to `(1, 1)` when the buffer is empty
 
 ## Build And Test
 
