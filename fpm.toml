@@ -9,7 +9,7 @@ description = "Virtual screen buffers and diff rendering helpers for modern Fort
 [build]
 auto-executables = false
 auto-tests = true
-auto-examples = false
+auto-examples = true
 
 [install]
 library = true
