@@ -33,6 +33,14 @@ program test_screen_render_ansi
   rendered = render_screen_ansi(previous)
   if (rendered /= expected) error stop "render_screen_ansi should use explicit row addressing for full-frame repaints"
 
+  current = allocate_screen(2, 1)
+  call put_glyph(current, 1, 1, "┌")
+  call put_glyph(current, 1, 2, "─")
+  expected = esc // "?25l" // esc // "2J" // esc // "H" // &
+             esc // "1;1H" // "┌─" // esc // "0m" // esc // "1;1H" // esc // "?25h"
+  rendered = render_screen_ansi(current)
+  if (rendered /= expected) error stop "render_screen_ansi should preserve UTF-8 glyph bytes"
+
   style = clear_screen_style()
   style%fg = 33
   style%bold = .true.

@@ -153,7 +153,7 @@ contains
     if (.not. allocated(buffer%cells)) return
 
     fill_cell = clear_screen_cell()
-    if (len(glyph) > 0) fill_cell%glyph = glyph(1:1)
+    fill_cell%glyph = glyph_for_cell(glyph)
     if (present(style)) fill_cell%style = style
 
     do row = 1, size(buffer%cells, 1)
@@ -191,7 +191,7 @@ contains
     if (.not. screen_index_in_bounds(buffer, row, col)) return
 
     cell = buffer%cells(row, col)
-    if (len(glyph) > 0) cell%glyph = glyph(1:1)
+    cell%glyph = glyph_for_cell(glyph)
     if (present(style)) cell%style = style
     call put_cell(buffer, row, col, cell)
   end subroutine put_glyph
@@ -346,7 +346,7 @@ contains
     type(screen_cell), intent(in) :: left
     type(screen_cell), intent(in) :: right
 
-    equal = left%glyph == right%glyph .and. screen_styles_equal(left%style, right%style)
+    equal = glyph_text(left) == glyph_text(right) .and. screen_styles_equal(left%style, right%style)
   end function screen_cells_equal
 
   logical function screen_styles_equal(left, right) result(equal)
@@ -415,7 +415,7 @@ contains
         end if
         current_key = cell_key
       end if
-      output = output // renderable_glyph(cell%glyph)
+      output = output // renderable_glyph(cell)
     end do
 
     if (len(current_key) > 0) then
@@ -449,7 +449,7 @@ contains
         end if
         current_key = cell_key
       end if
-      output = output // renderable_glyph(cell%glyph)
+      output = output // renderable_glyph(cell)
     end do
 
     if (len(current_key) > 0) then
@@ -567,16 +567,69 @@ contains
     text = trim(scratch)
   end function integer_text
 
-  function renderable_glyph(glyph) result(output)
-    character(len=1), intent(in) :: glyph
-    character(len=1) :: output
-    integer :: code
+  function glyph_text(cell) result(text)
+    type(screen_cell), intent(in) :: cell
+    character(len=:), allocatable :: text
 
-    code = iachar(glyph)
+    if (allocated(cell%glyph)) then
+      text = cell%glyph
+    else
+      text = " "
+    end if
+  end function glyph_text
+
+  function glyph_for_cell(glyph) result(output)
+    character(len=*), intent(in) :: glyph
+    character(len=:), allocatable :: output
+    integer :: code
+    integer :: glyph_bytes
+
+    if (len(glyph) == 0) then
+      output = " "
+      return
+    end if
+
+    code = iachar(glyph(1:1))
+    if (code < 32 .or. code == 127) then
+      output = "?"
+    else if (code < 128) then
+      output = glyph(1:1)
+    else
+      glyph_bytes = utf8_sequence_length(code)
+      if (glyph_bytes > 0 .and. len(glyph) >= glyph_bytes) then
+        output = glyph(1:glyph_bytes)
+      else
+        output = "?"
+      end if
+    end if
+  end function glyph_for_cell
+
+  integer function utf8_sequence_length(first_byte) result(byte_count)
+    integer, intent(in) :: first_byte
+
+    if (first_byte >= 192 .and. first_byte <= 223) then
+      byte_count = 2
+    else if (first_byte >= 224 .and. first_byte <= 239) then
+      byte_count = 3
+    else if (first_byte >= 240 .and. first_byte <= 247) then
+      byte_count = 4
+    else
+      byte_count = 0
+    end if
+  end function utf8_sequence_length
+
+  function renderable_glyph(cell) result(output)
+    type(screen_cell), intent(in) :: cell
+    character(len=:), allocatable :: output
+    integer :: code
+    character(len=:), allocatable :: glyph
+
+    glyph = glyph_text(cell)
+    code = iachar(glyph(1:1))
     if (code < 32 .or. code == 127) then
       output = "?"
     else
-      output = glyph
+      output = glyph_for_cell(glyph)
     end if
   end function renderable_glyph
 

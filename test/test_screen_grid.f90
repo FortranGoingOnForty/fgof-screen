@@ -19,6 +19,9 @@ program test_screen_grid
   if (.not. buffer%cells(2, 3)%style%underline) error stop "put_glyph should preserve style flags"
   if (buffer%cells(3, 2)%glyph /= " ") error stop "put_glyph should not transpose row and column"
 
+  call put_glyph(buffer, 3, 3, "┌")
+  if (buffer%cells(3, 3)%glyph /= "┌") error stop "put_glyph should preserve UTF-8 glyphs"
+
   cell = clear_screen_cell()
   cell%glyph = "@"
   cell%style%bg = 99
@@ -28,6 +31,7 @@ program test_screen_grid
 
   call resize_screen(buffer, 6, 4)
   if (buffer%cells(2, 3)%glyph /= "X") error stop "resize_screen should preserve overlapping content when growing"
+  if (buffer%cells(3, 3)%glyph /= "┌") error stop "resize_screen should preserve UTF-8 glyphs"
   if (buffer%cells(1, 4)%glyph /= "@") error stop "resize_screen should preserve existing cells when growing"
   if (buffer%cells(4, 6)%glyph /= " ") error stop "resize_screen should blank newly added cells"
 

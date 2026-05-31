@@ -13,7 +13,7 @@ module fgof_screen_types
   end type screen_style
 
   type, public :: screen_cell
-    character(len=1) :: glyph = " "
+    character(len=:), allocatable :: glyph
     type(screen_style) :: style
   end type screen_cell
 

@@ -99,6 +99,7 @@ Current semantics:
 - `render_cursor_ansi()` emits the final cursor move plus visibility state for a screen buffer
 - ANSI row rendering tracks style transitions explicitly and resets back to default style when needed
 - ANSI renderers replace ASCII control glyphs with `?` so screen cells cannot inject raw control bytes into the output stream
+- screen cells preserve one UTF-8 codepoint so box drawing and braille glyphs render without truncation
 
 ## Build And Test
 
