@@ -5,11 +5,16 @@ module fgof_screen_types
   type, public :: screen_style
     integer :: fg = -1
     integer :: bg = -1
+    logical :: fg_truecolor = .false.
+    logical :: bg_truecolor = .false.
+    integer :: fg_rgb(3) = [0, 0, 0]
+    integer :: bg_rgb(3) = [0, 0, 0]
     logical :: bold = .false.
     logical :: dim = .false.
     logical :: italic = .false.
     logical :: underline = .false.
     logical :: inverse = .false.
+    logical :: strikethrough = .false.
   end type screen_style
 
   type, public :: screen_cell

@@ -83,6 +83,7 @@ Current public procedures:
 Current semantics:
 
 - `screen_buffer%cells(row, col)` is the current virtual-grid layout
+- `screen_style` supports default color, 256-color indexes, truecolor RGB foreground/background, and common SGR attributes
 - `allocate_screen(width, height)` allocates a blank grid for positive sizes
 - newly allocated cells start as blank-space cells with default style
 - `resize_screen()` preserves overlapping content, blanks newly grown cells, and clamps the cursor into bounds

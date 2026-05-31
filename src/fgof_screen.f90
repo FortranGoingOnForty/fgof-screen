@@ -41,11 +41,16 @@ contains
 
     style%fg = -1
     style%bg = -1
+    style%fg_truecolor = .false.
+    style%bg_truecolor = .false.
+    style%fg_rgb = [0, 0, 0]
+    style%bg_rgb = [0, 0, 0]
     style%bold = .false.
     style%dim = .false.
     style%italic = .false.
     style%underline = .false.
     style%inverse = .false.
+    style%strikethrough = .false.
   end function clear_screen_style
 
   function clear_screen_cell() result(cell)
@@ -353,13 +358,18 @@ contains
     type(screen_style), intent(in) :: left
     type(screen_style), intent(in) :: right
 
-    equal = left%fg == right%fg .and. &
-            left%bg == right%bg .and. &
-            left%bold .eqv. right%bold .and. &
-            left%dim .eqv. right%dim .and. &
-            left%italic .eqv. right%italic .and. &
-            left%underline .eqv. right%underline .and. &
-            left%inverse .eqv. right%inverse
+    equal = left%fg == right%fg
+    equal = equal .and. left%bg == right%bg
+    equal = equal .and. (left%fg_truecolor .eqv. right%fg_truecolor)
+    equal = equal .and. (left%bg_truecolor .eqv. right%bg_truecolor)
+    equal = equal .and. all(left%fg_rgb == right%fg_rgb)
+    equal = equal .and. all(left%bg_rgb == right%bg_rgb)
+    equal = equal .and. (left%bold .eqv. right%bold)
+    equal = equal .and. (left%dim .eqv. right%dim)
+    equal = equal .and. (left%italic .eqv. right%italic)
+    equal = equal .and. (left%underline .eqv. right%underline)
+    equal = equal .and. (left%inverse .eqv. right%inverse)
+    equal = equal .and. (left%strikethrough .eqv. right%strikethrough)
   end function screen_styles_equal
 
   logical function screen_sizes_equal(left, right) result(equal)
@@ -479,9 +489,10 @@ contains
     type(screen_style), intent(in) :: style
 
     is_default = style%fg < 0 .and. style%bg < 0 .and. &
+                 (.not. style%fg_truecolor) .and. (.not. style%bg_truecolor) .and. &
                  (.not. style%bold) .and. (.not. style%dim) .and. &
                  (.not. style%italic) .and. (.not. style%underline) .and. &
-                 (.not. style%inverse)
+                 (.not. style%inverse) .and. (.not. style%strikethrough)
   end function style_is_default
 
   function style_key(style) result(key)
@@ -494,10 +505,19 @@ contains
     end if
 
     key = integer_text(style%fg) // ":" // integer_text(style%bg) // ":" // &
+          merge("1", "0", style%fg_truecolor) // ":" // merge("1", "0", style%bg_truecolor) // ":" // &
+          rgb_key(style%fg_rgb) // ":" // rgb_key(style%bg_rgb) // ":" // &
           merge("1", "0", style%bold) // ":" // merge("1", "0", style%dim) // ":" // &
           merge("1", "0", style%italic) // ":" // merge("1", "0", style%underline) // ":" // &
-          merge("1", "0", style%inverse)
+          merge("1", "0", style%inverse) // ":" // merge("1", "0", style%strikethrough)
   end function style_key
+
+  function rgb_key(rgb) result(key)
+    integer, intent(in) :: rgb(3)
+    character(len=:), allocatable :: key
+
+    key = integer_text(rgb(1)) // "," // integer_text(rgb(2)) // "," // integer_text(rgb(3))
+  end function rgb_key
 
   function style_ansi(style) result(output)
     type(screen_style), intent(in) :: style
@@ -509,9 +529,33 @@ contains
     if (style%italic) output = output // sgr_parameter("3")
     if (style%underline) output = output // sgr_parameter("4")
     if (style%inverse) output = output // sgr_parameter("7")
-    if (style%fg >= 0) output = output // sgr_parameter("38;5;" // integer_text(style%fg))
-    if (style%bg >= 0) output = output // sgr_parameter("48;5;" // integer_text(style%bg))
+    if (style%strikethrough) output = output // sgr_parameter("9")
+    if (style%fg_truecolor) then
+      output = output // sgr_parameter("38;2;" // rgb_ansi(style%fg_rgb))
+    else if (style%fg >= 0) then
+      output = output // sgr_parameter("38;5;" // integer_text(style%fg))
+    end if
+    if (style%bg_truecolor) then
+      output = output // sgr_parameter("48;2;" // rgb_ansi(style%bg_rgb))
+    else if (style%bg >= 0) then
+      output = output // sgr_parameter("48;5;" // integer_text(style%bg))
+    end if
   end function style_ansi
+
+  function rgb_ansi(rgb) result(text)
+    integer, intent(in) :: rgb(3)
+    character(len=:), allocatable :: text
+
+    text = integer_text(color_component(rgb(1))) // ";" // &
+           integer_text(color_component(rgb(2))) // ";" // &
+           integer_text(color_component(rgb(3)))
+  end function rgb_ansi
+
+  integer function color_component(value) result(component)
+    integer, intent(in) :: value
+
+    component = max(0, min(255, value))
+  end function color_component
 
   function sgr_parameter(parameter) result(output)
     character(len=*), intent(in) :: parameter

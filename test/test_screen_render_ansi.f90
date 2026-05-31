@@ -51,6 +51,19 @@ program test_screen_render_ansi
   rendered = render_screen_ansi(current)
   if (index(rendered, expected) == 0) error stop "render_screen_ansi should emit ANSI style codes and final hidden-cursor state"
 
+  style = clear_screen_style()
+  style%fg_truecolor = .true.
+  style%fg_rgb = [12, 34, 56]
+  style%bg_truecolor = .true.
+  style%bg_rgb = [78, 90, 123]
+  style%strikethrough = .true.
+  current = allocate_screen(1, 1)
+  call put_glyph(current, 1, 1, "T", style)
+  rendered = render_screen_ansi(current)
+  expected = esc // "0m" // esc // "9m" // esc // "38;2;12;34;56m" // &
+             esc // "48;2;78;90;123m" // "T" // esc // "0m"
+  if (index(rendered, expected) == 0) error stop "render_screen_ansi should emit truecolor and strikethrough SGR codes"
+
   rendered = render_cursor_ansi(previous)
   expected = esc // "2;1H" // esc // "?25h"
   if (rendered /= expected) error stop "render_cursor_ansi should move to the buffer cursor and show it"
